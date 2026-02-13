@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>💘 For Baby</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#0b0b12; overflow:hidden; }
+    canvas { display:block; width:100vw; height:100vh; }
+    .hint {
+      position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255,255,255,.85);
+      font-size: 14px; letter-spacing: .2px;
+      padding: 10px 14px; border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(6px);
+      user-select: none;
+    }
+    .hint b { color: rgba(255,255,255,.95); }
+  </style>
+</head>
+<body>
+  <div class="hint">Tap / click anywhere 💗 — each heart carries a message</div>
+  <canvas id="c"></canvas>
+
+  <script>
+    // ✨ Customize these messages
+    const MESSAGES = [
+      "I’m grateful for you.",
+      "Don't know when we start to call each other baby",
+      "I’m proud of you.",
+      "You're in my mind",
+      "Thank you for being you.",
+       "My qiziiiiiiiii",
+      "You are my medicine",
+      "I’m lucky to love you.",
+      "My girl frienddddddd",
+      "I choose you — again and again.",
+      "You make me smile for real.",
+      "Love you my Babyyy",
+      "I love you more than words."
+    ];
+
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+
+    // HiDPI / resize handling
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width  = Math.floor(innerWidth * dpr);
+      canvas.height = Math.floor(innerHeight * dpr);
+      canvas.style.width = innerWidth + "px";
+      canvas.style.height = innerHeight + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Simple helpers
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+    // Heart particles
+    const hearts = [];
+    let msgIndex = 0;
+
+    function nextMessage() {
+      const msg = MESSAGES[msgIndex % MESSAGES.length];
+      msgIndex++;
+      return msg;
+    }
+
+    function addHeart(x, y) {
+      const n = Math.floor(rand(3, 6)); // spawn a small cluster
+      for (let i = 0; i < n; i++) {
+        hearts.push({
+          x: x + rand(-12, 12),
+          y: y + rand(-12, 12),
+          vx: rand(-0.6, 0.6),
+          vy: rand(-2.4, -1.2),
+          scale: rand(0.6, 1.2),
+          rot: rand(-0.6, 0.6),
+          vr: rand(-0.02, 0.02),
+          life: rand(120, 180),
+          maxLife: 0, // set below
+          msg: (i === 0 ? nextMessage() : ""), // only one heart carries the text
+          hue: rand(320, 360) // pink-ish
+        });
+        hearts[hearts.length - 1].maxLife = hearts[hearts.length - 1].life;
+      }
+    }
+
+    // Draw a heart shape at origin, then transform
+    function drawHeartShape() {
+      ctx.beginPath();
+      // Parametric-ish heart (simple bezier)
+      ctx.moveTo(0, -10);
+      ctx.bezierCurveTo(12, -24, 36, -8, 0, 24);
+      ctx.bezierCurveTo(-36, -8, -12, -24, 0, -10);
+      ctx.closePath();
+    }
+
+    function drawHeart(h) {
+      const t = h.life / h.maxLife;
+      const alpha = clamp(t, 0, 1);
+
+      ctx.save();
+      ctx.translate(h.x, h.y);
+      ctx.rotate(h.rot);
+      ctx.scale(h.scale, h.scale);
+
+      // Glow
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = `hsla(${h.hue}, 90%, 60%, ${0.35 * alpha})`;
+
+      // Fill
+      ctx.fillStyle = `hsla(${h.hue}, 95%, 65%, ${0.85 * alpha})`;
+      drawHeartShape();
+      ctx.fill();
+
+      // Highlight
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `hsla(${h.hue}, 95%, 85%, ${0.35 * alpha})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Text message
+      if (h.msg) {
+        ctx.rotate(-h.rot);
+        ctx.scale(1 / h.scale, 1 / h.scale);
+
+        ctx.font = "600 16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+
+        // Soft text background
+        const padX = 10, padY = 6;
+        const w = ctx.measureText(h.msg).width;
+        const bx = -w / 2 - padX;
+        const by = -40 - padY;
+        const bw = w + padX * 2;
+        const bh = 22 + padY * 2;
+
+        ctx.fillStyle = `rgba(255,255,255,${0.08 * alpha})`;
+        roundRect(ctx, bx, by, bw, bh, 12);
+        ctx.fill();
+
+        // Text
+        ctx.fillStyle = `rgba(255,255,255,${0.92 * alpha})`;
+        ctx.fillText(h.msg, 0, -24);
+      }
+
+      ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rr);
+      ctx.arcTo(x + w, y + h, x, y + h, rr);
+      ctx.arcTo(x, y + h, x, y, rr);
+      ctx.arcTo(x, y, x + w, y, rr);
+      ctx.closePath();
+    }
+
+    // Background sparkles
+    const sparkles = Array.from({ length: 80 }, () => ({
+      x: Math.random() * innerWidth,
+      y: Math.random() * innerHeight,
+      r: rand(0.6, 1.6),
+      a: rand(0.12, 0.35),
+      tw: rand(0.004, 0.012)
+    }));
+
+    function drawBackground() {
+      // subtle gradient
+      const g = ctx.createLinearGradient(0, 0, innerWidth, innerHeight);
+      g.addColorStop(0, "#0b0b12");
+      g.addColorStop(1, "#120a16");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+      // sparkles
+      for (const s of sparkles) {
+        s.a += s.tw;
+        const a = 0.18 + 0.12 * Math.sin(s.a * Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Animation loop
+    function tick() {
+      drawBackground();
+
+      for (let i = hearts.length - 1; i >= 0; i--) {
+        const h = hearts[i];
+        h.x += h.vx;
+        h.y += h.vy;
+        h.vy += 0.02;      // gravity-ish
+        h.vx *= 0.995;     // slight damping
+        h.rot += h.vr;
+        h.life -= 1;
+
+        drawHeart(h);
+
+        if (h.life <= 0 || h.y < -120) hearts.splice(i, 1);
+      }
+
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    // Input: click/tap
+    function pointerPos(e) {
+      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { x: e.clientX, y: e.clientY };
+    }
+
+    canvas.addEventListener("click", (e) => {
+      const p = pointerPos(e);
+      addHeart(p.x, p.y);
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      const p = pointerPos(e);
+      addHeart(p.x, p.y);
+    }, { passive: true });
+
+    // Start with a few hearts in the center
+    addHeart(innerWidth * 0.5, innerHeight * 0.55);
+    addHeart(innerWidth * 0.5 + 80, innerHeight * 0.55 + 10);
+  </script>
+</body>
+</html>
